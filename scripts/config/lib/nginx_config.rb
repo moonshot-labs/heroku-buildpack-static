@@ -59,6 +59,12 @@ class NginxConfig
     logging = json["logging"] || {}
     json["logging"] = DEFAULT[:logging].merge(logging)
 
+    json["prerender"] ||= nil
+    prerender = json["prerender"]
+    if prerender&.has_key?("token")
+      json["prerender"]["token"] = NginxConfigUtil.interpolate(prerender["token"], ENV)
+    end
+
     nameservers = []
     if File.exist?("/etc/resolv.conf")
       File.open("/etc/resolv.conf", "r").each do |line|
