@@ -50,23 +50,9 @@ http {
     resolver <%= resolver %>;
   <% end %>
 
-    location / {
-      mruby_post_read_handler /app/bin/config/lib/ngx_mruby/headers.rb cache;
-      mruby_set $fallback /app/bin/config/lib/ngx_mruby/routes_fallback.rb cache;
-    <% if prerender %>
-      try_files $uri @prerender;
-    <% elsif clean_urls %>
-      try_files $uri.html $uri $uri/ $fallback;
-    <% else %>
-      try_files $uri $uri/ $fallback;
-    <% end %>
-    }
-
-  <% if clean_urls %>
-    location ~ \.html$ {
-      try_files $uri =404;
-    }
-  <% end %>
+  location / {
+    try_files $uri @prerender;
+  }
 
   <% if https_only %>
     if ($http_x_forwarded_proto != "https") {
@@ -74,46 +60,10 @@ http {
     }
   <% end %>
 
-  <% routes.each do |route, path| %>
-    location ~ ^<%= route %>$ {
-      set $route <%= route %>;
-      mruby_set $path /app/bin/config/lib/ngx_mruby/routes_path.rb cache;
-      mruby_set $fallback /app/bin/config/lib/ngx_mruby/routes_fallback.rb cache;
-    <% if prerender %>
-      try_files $uri $path @prerender;
-    <% elsif clean_urls %>
-      try_files $uri.html $uri $uri/ $path $fallback;
-    <% else %>
-      try_files $uri $path $fallback;
-    <% end %>
-    }
-  <% end %>
-
   # need this b/c setting $fallback to =404 will try #{root}=404 instead of returning a 404
   location @404 {
     return 404;
   }
-
-  # fallback proxy named match
-  <% proxies.each do |location, hash| %>
-    set $<%= hash['name'] %> <%= hash['host'] %>;
-    location @<%= location %> {
-      rewrite ^<%= location %>/?(.*)$ <%= hash['path'] %>/$1 break;
-      # can reuse variable set above
-      proxy_pass $<%= hash['name'] %>;
-      proxy_ssl_server_name on;
-      <% %w(http https).each do |scheme| %>
-      proxy_redirect <%= hash["redirect_#{scheme}"] %> <%= location %>;
-      <% end %>
-    }
-  <% end %>
-
-  # fallback redirects named match
-  <% redirects.each do |path, hash| %>
-    location @<%= path %> {
-      return <%= hash['status'] || 301 %> <%= hash['url'] %>;
-    }
-  <% end %>
 
   <% if prerender %>
     location @prerender {
